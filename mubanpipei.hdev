@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="24.05.0.0">
+<procedure name="main">
+<interface/>
+<body>
+<c>*图形匹配</c>
+<c>* 读取图像</c>
+<l>read_image (Image, 'C:/A组会汇报/图片/OIP-C.jpg')</l>
+<l>get_image_size (Image, Width, Height)</l>
+<l>dev_get_window (WindowHandle)</l>
+<l>dev_display (Image)</l>
+<c></c>
+<c>* 二值化图像</c>
+<l>threshold (Image, Region, 128, 255)</l>
+<l>connection (Region, ConnectedRegions)</l>
+<l>select_shape (ConnectedRegions, SelectedRegions, 'area', 'and', 15000, 25000)</l>
+<l>fill_up (SelectedRegions, RegionFillUp)</l>
+<l>dilation_circle (RegionFillUp, RegionDilation, 5.5)</l>
+<l>reduce_domain (Image, RegionDilation, ImageReduced)</l>
+<c>*生成模版图</c>
+<c></c>
+<l>gen_circle (ROI_0, 25, 25, 24)</l>
+<l>gen_image_const(Image1, 'byte', 50, 50)</l>
+<l>paint_region(ROI_0,Image1,ImageReduced, 255, 'fill')</l>
+<c></c>
+<c></c>
+<l>read_image(Image0,'C:/03_影像仪软件相关/图片/屏幕截图 2024-11-12 0756261.png')</l>
+<c></c>
+<c>* 创建缩放形状模型</c>
+<l>create_scaled_shape_model (ImageReduced, 5, rad(-45), rad(90), 'auto', 0.8, 1.0, 'auto', 'none', 'ignore_global_polarity', 40, 10, ModelID)</l>
+<c></c>
+<c>* 获取形状模型的轮廓</c>
+<l>get_shape_model_contours (Model, ModelID, 1)</l>
+<c></c>
+<c>* 计算参考点的中心</c>
+<l>area_center (RegionFillUp, Area, RowRef, ColumnRef)</l>
+<c></c>
+<c>* 生成模板中心点的XLD轮廓</c>
+<l>gen_cross_contour_xld (Cross, RowRef, ColumnRef, 56, 0.785398)</l>
+<c></c>
+<c>* 创建刚性变换矩阵</c>
+<l>vector_angle_to_rigid (0, 0, 0, RowRef, ColumnRef, 0, HomMat2D)</l>
+<l>affine_trans_contour_xld (Model, ModelTrans, HomMat2D)</l>
+<c></c>
+<c>* 显示图像和模型</c>
+<l>dev_display (Image0)</l>
+<l>dev_display (ModelTrans)</l>
+<c></c>
+<c>* 读取匹配的图像</c>
+<l>read_image (ImageSearch, 'C:/03_影像仪软件相关/图片/屏幕截图 2024-11-12 0756261.png')</l>
+<l>dev_display (Image0)</l>
+<c></c>
+<c>* 查找缩放形状模型</c>
+<l>find_scaled_shape_model (Image0, ModelID, rad(-45), rad(90), 0.8, 1.0, 0.5, 0, 0.5, 'least_squares', 5, 0.8, Row, Column, Angle, Scale, Score)</l>
+<c></c>
+<c>* 处理每个匹配结果</c>
+<l>gen_empty_obj(ModelTransAll)</l>
+<l>gen_empty_obj(ModelTransRegionAll)</l>
+<c></c>
+<l>for I := 0 to |Score| - 1 by 1</l>
+<l>    hom_mat2d_identity (HomMat2DIdentity)</l>
+<l>    hom_mat2d_translate (HomMat2DIdentity, Row[I], Column[I], HomMat2DTranslate)</l>
+<l>    hom_mat2d_rotate (HomMat2DTranslate, Angle[I], Row[I], Column[I], HomMat2DRotate)</l>
+<l>    hom_mat2d_scale (HomMat2DRotate, Scale[I], Scale[I], Row[I], Column[I], HomMat2DScale)</l>
+<l>    affine_trans_contour_xld (Model, ModelTrans, HomMat2DScale)</l>
+<l>    concat_obj(ModelTransAll, ModelTrans, ModelTransAll)</l>
+<c></c>
+<c>    </c>
+<c>    * 把XLD轮廓变成区域</c>
+<l>    gen_region_contour_xld (ModelTrans, Region1, 'filled')</l>
+<c>    </c>
+<c></c>
+<c>    * 计算匹配区域的边界框</c>
+<l>    *smallest_rectangle2 (Region1, Row1, Column1, Phi, Length1, Length2)</l>
+<l>    smallest_rectangle1 (Region1, Row1, Column1, Row2, Column2)</l>
+<c>    * 生成矩形ROI区域</c>
+<l>    *gen_rectangle2_contour_xld (Rectangle, Row1, Column1, Phi, Length1+2, Length2+2)</l>
+<l>     gen_rectangle1(RectangleRegion, Row1-1.5, Column1-1.5, Row2+1.5, Column2+1.5)</l>
+<l>     crop_part (Image0, ImagePart, Row1-1.5, Column1-1.5, (Column2-Column1+3), (Row2-Row1+3))</l>
+<l>     write_image(ImagePart, 'png', 0, 'C:/03_影像仪软件相关/图片/xunlian_'+I+'.png')</l>
+<l>     *gen_contour_region_xld(RectangleRegion, Rectangle, 'border')</l>
+<l>     concat_obj(ModelTransRegionAll, RectangleRegion, ModelTransRegionAll)</l>
+<c>    </c>
+<c></c>
+<l>endfor</l>
+<c>* 生成匹配中心点的XLD轮廓</c>
+<l>gen_cross_contour_xld (Cross1, Row, Column, 16, 0.785398)</l>
+<c>* 显示匹配的模型轮廓、中心点轮廓和矩形ROI区域</c>
+<l>dev_display (Image0)</l>
+<l>dev_set_color ('blue')</l>
+<l>dev_display (ModelTransAll)</l>
+<l>dev_set_color ('green')</l>
+<l>dev_display (Cross1)</l>
+<l>dev_set_color ('yellow')</l>
+<l>dev_display (ModelTransRegionAll)</l>
+<l>dev_disp_text ('找出的模型', 'window', 'top', 'left', 'black', [], [])</l>
+<l>stop()</l>
+<c></c>
+<c>* 开启新窗口用来显示</c>
+<l>*dev_open_window (0, 0, 512, 512, 'black', WindowHandle1)</l>
+<l>*dev_display (ImagePart)</l>
+<c></c>
+<c>* 模型训练</c>
+<c>* 时间单位为秒，乘以1000则为毫秒单位</c>
+<l>count_seconds (T1)</l>
+<c></c>
+<l>dev_get_window (WindowHandle)</l>
+<c></c>
+<l>read_image (Image, 'C:/03_影像仪软件相关/图片/屏幕截图 2024-11-12 0756261.png')</l>
+<c></c>
+<c>* 图像滤波</c>
+<l>median_image(Image,result13,'circle',3,'mirrored')</l>
+<c>* 增强对比度</c>
+<l>illuminate (result13, ImageIlluminate, 40, 40, 0.55)</l>
+<c></c>
+<c></c>
+<l>get_image_size(Image, ImageWidth, ImageHeight)</l>
+<c></c>
+<l>query_available_dl_devices (['runtime', 'runtime'], ['gpu', 'cpu'], DLDeviceHandles)</l>
+<l>if (|DLDeviceHandles| == 0)</l>
+<l>    throw ('No supported device found to continue this example.')</l>
+<l>endif</l>
+<c></c>
+<l>DLDevice := DLDeviceHandles[0]</l>
+<c></c>
+<l>read_dl_model ('C:/HALCON/GPTfenge/GPTfenge/fenge2.hdl', DLModelHandle)</l>
+<l>set_dl_model_param (DLModelHandle, 'batch_size', 1)</l>
+<l>DlModelDim1:=256</l>
+<l>DlModelDim2:=256</l>
+<c></c>
+<l>set_dl_model_param (DLModelHandle, 'image_dimensions', [256,256,1])</l>
+<l>set_dl_model_param (DLModelHandle, 'device', DLDevice)</l>
+<l>create_dl_preprocess_param_from_model (DLModelHandle, 'none', 'full_domain', [], [], [], DLPreprocessParam)</l>
+<c></c>
+<l>set_display_font (WindowHandle, 15, 'mono', 'true', 'false')</l>
+<l>dev_set_color ('cyan')</l>
+<l>WaitSeconds := 0.7</l>
+<l>MinConfidence := 0.8</l>
+<c></c>
+<c>* 膨胀操作</c>
+<l>*DisplayDilation := 1</l>
+<c></c>
+<c></c>
+<c></c>
+<l>count_obj (ModelTransRegionAll, Number)</l>
+<c></c>
+<l>gen_empty_obj (AllSelectedXLD)</l>
+<c></c>
+<l>NumCircles := 0</l>
+<c></c>
+<l>for Index := 1 to Number by 1</l>
+<c>    </c>
+<l>    NumCircles := NumCircles + 1</l>
+<c>    </c>
+<c>    *test</c>
+<l>    select_obj(ModelTransRegionAll, selectRect, Index)</l>
+<l>    smallest_rectangle1 (selectRect, Row11, Column11, Row21, Column21)</l>
+<l>    crop_part (ImageIlluminate, ImageReduced1, Row11, Column11, Column21- Column11, Row21-Row11)</l>
+<c>    </c>
+<l>    apply_dl_edge_extractor (ImageReduced1, ConfidentEdgeRegion, DLModelHandle, DLPreprocessParam, MinConfidence)</l>
+<l>    skeleton (ConfidentEdgeRegion, DLEdges)</l>
+<c>    * 膨胀操作</c>
+<l>    *dilation_circle (DLEdges, DLEdgesDisplay, DisplayDilation)</l>
+<c>    * 缩放与平移Region</c>
+<l>    zoom_region (DLEdges, RegionZoom, (Column21 - Column11)*1.0/DlModelDim1, (Row21 - Row11)*1.0/DlModelDim2)</l>
+<l>    move_region (RegionZoom, RegionMoved, Row11, Column11)</l>
+<c>    </c>
+<l>    closing_circle (RegionMoved, RegionMoved, 3.5)</l>
+<c>    </c>
+<l>    skeleton (RegionMoved, Skeleton)</l>
+<c>    </c>
+<c>    * 将Skeleton储存在AllSelectedXLD里</c>
+<l>    *concat_obj (AllSelectedXLD, Skeleton, AllSelectedXLD)</l>
+<c>    </c>
+<c>    * 转骨架到XLD轮廓</c>
+<l>    gen_contours_skeleton_xld(Skeleton, Contours1, 1, 'filter')</l>
+<c>    </c>
+<l>    *junctions_skeleton (RegionMoved, EndPoints, JuncPoints)</l>
+<c>    * Region转XLD</c>
+<l>    *gen_contour_region_xld (RegionMoved, Contours, 'center')</l>
+<c>    </c>
+<c>    * 选择XLD轮廓线圆度在0.8-1之间的</c>
+<l>    select_shape_xld(Contours1, SelectedXLD, 'circularity', 'and', 0.8, 1)</l>
+<c>    *选择XLD轮廓大于1的</c>
+<l>    select_contours_xld (SelectedXLD, SelectedContours, 'contour_length', 1, 200, -0.5, 0.5)</l>
+<c>    </c>
+<l>    fit_circle_contour_xld (SelectedContours, 'atukey', -1, 2, 0, 5, 2, FitCircleCenterRow, FitCircleCenterColumn, FitCircleCenterRadius, StartPhi, EndPhi, PointOrder)</l>
+<c>    </c>
+<l>    *fit_circle_contour_xld (SelectedContours, 'algebraic', -1, 0, 0, 3, 2, FitCircleCenterRow, FitCircleCenterColumn, FitCircleCenterRadius, StartPhi, EndPhi, PointOrder)</l>
+<c>    </c>
+<l>    gen_circle_contour_xld (ContCircle, FitCircleCenterRow, FitCircleCenterColumn, FitCircleCenterRadius, 0, rad(360), 'positive', 1)</l>
+<l>    gen_cross_contour_xld (FitCircleCenterCross, FitCircleCenterRow, FitCircleCenterColumn, 6, StartPhi)</l>
+<c>    </c>
+<c>    * 将XLD轮廓储存在AllSelectedXLD里（前面要先对AllSelectedXLD赋值）</c>
+<l>    concat_obj (AllSelectedXLD, ContCircle, AllSelectedXLD)</l>
+<c>    </c>
+<l>    count_seconds (T2)</l>
+<l>    RunTime := (T2 - T1)*1000</l>
+<c>    </c>
+<l>    dev_display (ContCircle)</l>
+<l>    dev_display (FitCircleCenterCross)</l>
+<c>    </c>
+<c>    * 在图像上设置文本位置并显示圆的编号</c>
+<l>    set_tposition (WindowHandle, FitCircleCenterRow - FitCircleCenterRadius - 10, FitCircleCenterColumn)</l>
+<c>    </c>
+<l>     write_string (WindowHandle, 'C' + NumCircles)</l>
+<c>    * 创建结果文本，注意需要将Radius转换为字符串</c>
+<c>    </c>
+<l>    ResultText := 'C' + NumCircles + ': radius = ' + FitCircleCenterRadius</l>
+<c>    </c>
+<l>    set_tposition (WindowHandle, 0, 0)</l>
+<l>    write_string (WindowHandle, ResultText)</l>
+<c></c>
+<c>    * 设置断点来查看每张图片的提取结果</c>
+<l>    stop ()</l>
+<l>endfor</l>
+<c></c>
+<c>* 显示单个圆的提取效果</c>
+<l>*stop ()</l>
+<l>*closing_circle (RegionZoom, RegionMoved1, 3.5)</l>
+<l>*skeleton (RegionMoved1, Skeleton1)</l>
+<c>* 转骨架到XLD轮廓</c>
+<l>*gen_contours_skeleton_xld(Skeleton1, Contours2, 1, 'filter')</l>
+<c>* 开启新窗口用来显示</c>
+<l>*dev_open_window (0, 0, 512, 512, 'black', WindowHandle1)</l>
+<l>*dev_display (ImagePart)</l>
+<l>*dev_display (Contours2)</l>
+<l>*stop ()</l>
+<c></c>
+<c>* 生成边缘点的XLD轮廓</c>
+<c>* 选择第一个XLD轮廓</c>
+<l>*select_obj (AllSelectedXLD, ObjectSelected, 12)</l>
+<c>* 返回XLD轮廓坐标</c>
+<l>*get_contour_xld (ObjectSelected, Row, Col)</l>
+<c>* 生成轮廓上的每个点（生成十字轮廓）</c>
+<l>*gen_cross_contour_xld (Cross, Row, Col, 6, 0.785398)</l>
+<c></c>
+<l>dev_clear_window ()</l>
+<l>dev_display (Image)</l>
+<l>dev_disp_text ('程序运行的时间： '+RunTime+'  ms', 'window', 'top', 'right', 'black', [], [])</l>
+<l>dev_display (AllSelectedXLD)</l>
+<c></c>
+<l>*dev_display (Cross)</l>
+<c>* 显示圆心</c>
+<l>*dev_display (FitCircleCenterCross)</l>
+<l>set_tposition (WindowHandle, 0 + Index, 0)</l>
+<l>write_string (WindowHandle, ResultText)</l>
+<c></c>
+<l>stop()</l>
+<c></c>
+<c>* 开启新窗口用来显示</c>
+<l>dev_open_window (0, 0, 416, 527, 'black', WindowHandle1)</l>
+<l>dev_display (Image)</l>
+<l>dev_display (AllSelectedXLD)</l>
+<l>stop ()</l>
+<c></c>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+<procedure name="apply_dl_edge_extractor">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="ConfidentEdgeRegion" base_type="iconic" dimension="0"/>
+</oo>
+<ic>
+<par name="DLModelHandle" base_type="ctrl" dimension="0"/>
+<par name="DLPreprocessParam" base_type="ctrl" dimension="0"/>
+<par name="MinConfidence" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<body>
+<c>* This local procedure performs the inference of the DL edge extraction</c>
+<c>* model on the input image and returns the extracted edges.</c>
+<c></c>
+<c>* Create DLSample from the input image and perform DL-specific preprocessing.</c>
+<l>gen_dl_samples_from_images (Image, DLSample)</l>
+<l>preprocess_dl_samples (DLSample, DLPreprocessParam)</l>
+<c></c>
+<c>* Apply DL model and get inference result.</c>
+<l>apply_dl_model (DLModelHandle, DLSample, [], DLResult)</l>
+<l>get_dict_object (SegmentationImage, DLResult, 'segmentation_image')</l>
+<l>get_dict_object (SegmentationConfidence, DLResult, 'segmentation_confidence')</l>
+<l>threshold (SegmentationImage, DLEdgeRegion, 1, 255)</l>
+<l>threshold (SegmentationConfidence, ConfidentRegion, MinConfidence, 255)</l>
+<l>intersection (DLEdgeRegion, ConfidentRegion, ConfidentEdgeRegion)</l>
+<c></c>
+<l>return ()</l>
+</body>
+<docu id="apply_dl_edge_extractor">
+<parameters>
+<parameter id="ConfidentEdgeRegion"/>
+<parameter id="DLModelHandle"/>
+<parameter id="DLPreprocessParam"/>
+<parameter id="Image"/>
+<parameter id="MinConfidence"/>
+</parameters>
+</docu>
+</procedure>
+</hdevelop>
