@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="24.05.0.0">
+<procedure name="main">
+<interface/>
+<body>
+<l>dev_get_window (WindowHandle)</l>
+<l>read_image (Image, 'C:/03_影像仪软件相关/图片/0030.bmp')</l>
+<l>rgb1_to_gray (Image, GrayImage)</l>
+<l>get_image_size (Image, Width0, Height0)</l>
+<c></c>
+<c>* 阈值分割方案1（自动全局阈值分割）</c>
+<c>* 图像滤波</c>
+<c>* mask掩膜窗口为3x3（均值滤波）</c>
+<l>mean_image(GrayImage,Image00,3,3)</l>
+<c>* 增强对比度</c>
+<l>*illuminate (Image0, ImageIlluminate, 40, 40, 0.55)</l>
+<c>* 自动全局阈值分割</c>
+<l>binary_threshold (Image00, Region, 'max_separability', 'light', UsedThreshold)</l>
+<l>connection(Region, ConnectedRegions)</l>
+<l>select_shape (ConnectedRegions, SelectedRegions, 'area', 'and', 35000, 200000)</l>
+<c></c>
+<c>* 阈值分割方案2（动态阈值分割）</c>
+<c>* 灰度线性缩放再此方法</c>
+<l>scale_image_max (GrayImage, ImageScaleMax)</l>
+<l>mean_image(ImageScaleMax,ImageMean, 19, 19)</l>
+<l>dyn_threshold (Image, ImageMean, RegionDynThresh1, 15, 'dark')</l>
+<c></c>
+<c>* 阈值分割方案3（局部方差的动态阈值的分割）</c>
+<l>gen_rectangle1 (Rectangle1, 30, 20, 1000, 1800)</l>
+<l>reduce_domain (GrayImage, Rectangle1, ImageReduced)</l>
+<l>var_threshold (ImageReduced, Region, 5, 5, 0.2, 20, 'dark')</l>
+<c></c>
+<c>* 闭运算</c>
+<l>closing_circle (RegionDynThresh1, RegionClosing, 30)</l>
+<c></c>
+<c>* 创建空白图像，将得到的区域贴到上面</c>
+<l>get_image_size (Image, Width1, Height1)</l>
+<l>gen_image_proto (Image, ImageCleared, 0)</l>
+<l>paint_region (RegionClosing, ImageCleared, ImageResult, 255, 'fill')</l>
+<c></c>
+<l>dev_clear_window ()</l>
+<l>dev_display (Image)</l>
+<l>dev_display (ImageResult)</l>
+<l>stop()</l>
+<c></c>
+<c></c>
+<c>* 时间单位为秒，乘以1000则为毫秒单位</c>
+<l>count_seconds (T1)</l>
+<c></c>
+<l>dev_update_off ()</l>
+<l>dev_close_window ()</l>
+<c></c>
+<l>ImageWidth := 640</l>
+<l>ImageHeight := 512</l>
+<c></c>
+<l>query_available_dl_devices (['runtime', 'runtime'], ['gpu', 'cpu'], DLDeviceHandles)</l>
+<l>if (|DLDeviceHandles| == 0)</l>
+<l>    throw ('No supported device found to continue this example.')</l>
+<l>endif</l>
+<c></c>
+<l>DLDevice := DLDeviceHandles[0]</l>
+<c></c>
+<l>read_dl_model ('C:/HALCON/GPTfenge/GPTfenge/fenge2.hdl', DLModelHandle)</l>
+<l>set_dl_model_param (DLModelHandle, 'batch_size', 1)</l>
+<l>set_dl_model_param (DLModelHandle, 'image_dimensions', [ImageWidth,ImageHeight,1])</l>
+<l>set_dl_model_param (DLModelHandle, 'device', DLDevice)</l>
+<l>create_dl_preprocess_param_from_model (DLModelHandle, 'none', 'full_domain', [], [], [], DLPreprocessParam)</l>
+<c></c>
+<c>* 裁剪指定区域的图片</c>
+<l>*crop_rectangle1 (Image, Image0, 25, 55, 470, 500)</l>
+<c>* 对图片进行缩放</c>
+<l>zoom_image_size (Image, Image1, ImageWidth, ImageHeight, 'constant')</l>
+<c></c>
+<c>*</c>
+<l>reduce_domain (Image, Image, ImageReduced)</l>
+<c>* 获取图像大小</c>
+<l>get_image_size (ImageReduced, Width1, Height1)</l>
+<c></c>
+<l>*crop_rectangle1 (ImageResult, Image2, 25, 55, 470, 500)</l>
+<c></c>
+<l>dev_clear_window ()</l>
+<c></c>
+<l>*zoom_image_size (Image2, Image3, ImageWidth, ImageHeight, 'constant')</l>
+<c></c>
+<l>set_display_font (WindowHandle, 15, 'mono', 'true', 'false')</l>
+<l>dev_set_color ('cyan')</l>
+<l>WaitSeconds := 0.7</l>
+<l>MinConfidence := 0.8</l>
+<c></c>
+<l>apply_dl_edge_extractor (ImageResult, ConfidentEdgeRegion, DLModelHandle, DLPreprocessParam, MinConfidence)</l>
+<c>* 将提取到的边缘还原回图像中（记得更换图片尺寸）</c>
+<l>zoom_region (ConfidentEdgeRegion, RegionZoom, (1920-0)*1.0/ImageWidth, (1080-0)*1.0/ImageHeight)</l>
+<l>move_region (RegionZoom, RegionMoved, 0, 0)</l>
+<c></c>
+<c>* 骨架处理</c>
+<l>skeleton (RegionMoved, DLEdges)</l>
+<c></c>
+<c>* 转骨架到XLD轮廓</c>
+<l>gen_contours_skeleton_xld(DLEdges, Contours1, 1, 'filter')</l>
+<c></c>
+<l>count_seconds (T2)</l>
+<c> </c>
+<l>RunTime := (T2 - T1)*1000</l>
+<c></c>
+<c>* 选择第一个XLD轮廓</c>
+<l>*select_obj (Contours1, ObjectSelected, 12)</l>
+<c>* 返回XLD轮廓坐标</c>
+<l>*get_contour_xld (ObjectSelected, Row, Col)</l>
+<c>* 生成轮廓上的每个点（生成十字轮廓）</c>
+<l>*gen_cross_contour_xld (Cross, Row, Col, 6, 0.785398)</l>
+<c></c>
+<l>dev_clear_window ()</l>
+<l>dev_display (Image)</l>
+<c></c>
+<c>* 显示文字：不会随图像变化而消失</c>
+<l>dev_disp_text ('程序运行的时间： '+RunTime+'  ms', 'window', 'top', 'right', 'black', [], [])</l>
+<c>* 显示文字：会随图像变化而消失</c>
+<l>*disp_message (WindowHandle, '程序运行的时间： '+RunTime+'  ms', 'window', 10, 10, 'black', 'true')</l>
+<c></c>
+<l>*dev_display (Cross)</l>
+<l>*dev_set_color ('red')</l>
+<l>dev_display (Contours1)</l>
+<l>stop()</l>
+<c></c>
+<c>*通过XLD的圆度来筛选</c>
+<l>select_shape_xld (Contours1, EdgesContour, 'circularity', 'and', 0.50166, 1)</l>
+<l>fit_circle_contour_xld (EdgesContour, 'algebraic', -1, 0, 0, 3, 2, FitCircleCenterRow, FitCircleCenterColumn, FitCircleCenterRadius, StartPhi, EndPhi, PointOrder)</l>
+<l>gen_circle_contour_xld (ContCircle, FitCircleCenterRow, FitCircleCenterColumn, FitCircleCenterRadius, 0, rad(360), 'positive', 1)</l>
+<l>gen_cross_contour_xld (FitCircleCenterCross, FitCircleCenterRow, FitCircleCenterColumn, 6, StartPhi)</l>
+<c></c>
+<l>count_obj (ContCircle, Number)</l>
+<l>NumCircles := 0</l>
+<c></c>
+<l>for Index := 1 to Number by 1 </l>
+<l>    NumCircles := NumCircles + 1</l>
+<l>    write_string (WindowHandle, 'C' + NumCircles)</l>
+<l>    ResultText := 'C' + NumCircles + ': radius = ' + FitCircleCenterRadius</l>
+<l>endfor</l>
+<c></c>
+<l>dev_clear_window ()</l>
+<l>dev_display (Image)</l>
+<l>dev_display (ContCircle)</l>
+<l>stop()</l>
+<c></c>
+<l>dev_open_window (0, 0, 809, 734, 'black', WindowHandle1)</l>
+<l>dev_display(Image)</l>
+<l>dev_display(ContCircle)</l>
+<c></c>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+<procedure name="apply_dl_edge_extractor">
+<interface>
+<io>
+<par name="Image" base_type="iconic" dimension="0"/>
+</io>
+<oo>
+<par name="ConfidentEdgeRegion" base_type="iconic" dimension="0"/>
+</oo>
+<ic>
+<par name="DLModelHandle" base_type="ctrl" dimension="0"/>
+<par name="DLPreprocessParam" base_type="ctrl" dimension="0"/>
+<par name="MinConfidence" base_type="ctrl" dimension="0"/>
+</ic>
+</interface>
+<body>
+<c>* This local procedure performs the inference of the DL edge extraction</c>
+<c>* model on the input image and returns the extracted edges.</c>
+<c></c>
+<c>* Create DLSample from the input image and perform DL-specific preprocessing.</c>
+<l>gen_dl_samples_from_images (Image, DLSample)</l>
+<l>preprocess_dl_samples (DLSample, DLPreprocessParam)</l>
+<c></c>
+<c>* Apply DL model and get inference result.</c>
+<l>apply_dl_model (DLModelHandle, DLSample, [], DLResult)</l>
+<l>get_dict_object (SegmentationImage, DLResult, 'segmentation_image')</l>
+<l>get_dict_object (SegmentationConfidence, DLResult, 'segmentation_confidence')</l>
+<l>threshold (SegmentationImage, DLEdgeRegion, 1, 255)</l>
+<l>threshold (SegmentationConfidence, ConfidentRegion, MinConfidence, 255)</l>
+<l>intersection (DLEdgeRegion, ConfidentRegion, ConfidentEdgeRegion)</l>
+<c></c>
+<l>return ()</l>
+</body>
+<docu id="apply_dl_edge_extractor">
+<parameters>
+<parameter id="ConfidentEdgeRegion"/>
+<parameter id="DLModelHandle"/>
+<parameter id="DLPreprocessParam"/>
+<parameter id="Image"/>
+<parameter id="MinConfidence"/>
+</parameters>
+</docu>
+</procedure>
+</hdevelop>
